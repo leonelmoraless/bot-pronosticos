@@ -68,14 +68,21 @@ async def webhook(request: Request, background_tasks: BackgroundTasks, db: Async
     Mock webhook receiver for WhatsApp messages.
     Expects JSON payload with 'from', 'body', 'name'.
     """
+    # Try JSON first (for local testing), then Form (for Twilio)
     try:
         data = await request.json()
     except:
-        return {"status": "error", "message": "Invalid JSON"}
+        form = await request.form()
+        data = dict(form)
 
-    sender_phone = int(data.get("from", "0").replace("@c.us", ""))
-    message_body = data.get("body", "").strip()
-    sender_name = data.get("name", "Unknown")
+    # Twilio format: 'From': 'whatsapp:+51999...', 'Body': 'text', 'ProfileName': 'Name'
+    sender = data.get("From") or data.get("from") or "0"
+    sender_phone = int(sender.replace("whatsapp:", "").replace("@c.us", ""))
+    
+    message_body = data.get("Body") or data.get("body") or ""
+    message_body = message_body.strip()
+    
+    sender_name = data.get("ProfileName") or data.get("name") or "Unknown"
 
     if not message_body.startswith("!"):
         return {"status": "ignored"}
